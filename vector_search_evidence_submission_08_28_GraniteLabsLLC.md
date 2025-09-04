@@ -164,9 +164,9 @@ SHA-256 checksum of the code bundle:
 
 **Pipeline (technical):**
 
-1. Per‑dimension range scan. For each dimension d, compute a robust range \[0,Rd\]. On SIFT‑1M we cap at Rd≈0.8⋅max⁡(abs(xd)) to reduce outlier influence.  
-2. Quantize. Map ![][image3] using linear scaling and clipping to ![][image4].  
-3. Bit‑slice. Store ![][image5] across bit planes ![][image6] so that plane ![][image7] ​ holds the s‑th bit of all ![][image8].  
+1. Per‑dimension range scan. For each dimension d, compute a robust range $[0,R_d]$. On SIFT‑1M we cap at Rd≈0.8⋅max⁡(abs(xd)) to reduce outlier influence.  
+2. Quantize. Map $x_d \rightarrow q_d \in \{0,\ldots,2^b-1\}$ with $b \in \{2,4\}$ using linear scaling and clipping to $[0, R_d]$.  
+3. Bit‑slice. Store $q_d$ across bit planes $P_0,\ldots,P_{b-1}$ so that plane $P_s$​ holds the s‑th bit of all $q_d$.  
 4. Dot‑product via bitwise ops. Approximate the dot product using **bit‑planes** and **popcount** on GPU: for **b** bits per dimension, sum plane‑wise **AND** matches weighted by bit significance (coalesced loads; warp‑level popcount). This converts FLOPs into **bit‑ops**, reducing memory traffic and compute.  
 5. **Internal‑k refinement.** Keep the k best candidates (typically 8–20) and run a full‑precision distance on just those; add ≈0.25 ms per 10k batch.  
 6. MAD policy. If MAD damages recall (e.g., SIFT‑1M), set MAD=OFF for this stage; otherwise keep MAD gating for aggressive pruning. Gets the best of both worlds.
@@ -246,7 +246,7 @@ Evidence of authorship is supported by communication history in our private emai
 
 * **Build (CPU, single thread):** per‑dimension pass \+ quantization; linear in N⋅DN⋅D; negligible memory beyond storing bb bit planes.
 
-* **Search (GPU):**  ![][image9]bit‑plane passes over candidate sets; memory‑bandwidth bound with excellent cache locality; exact‑refinement adds ![][image10] FLOPs on a handful of vectors.
+* **Search (GPU):**  $\mathcal{O}(K \cdot b)$ bit‑plane passes over candidate sets; memory‑bandwidth bound with excellent cache locality; exact‑refinement adds $\mathcal{O}(k)$ FLOPs on a handful of vectors.
 
 * **Footprint:** 2‑bit quantization ≈ **4×** compression, 4‑bit ≈ **2×**, often allowing **larger shard fan‑in** at the same VRAM budget.
 
@@ -490,7 +490,9 @@ Fashion‑60K summary: **208,333 QPS (48 ms)** at 10k queries and **133,333�
 * Index growth: hierarchical/partitioned (IVF, HNSW “binary‑tree‑like” navigation) do sublinear comparisons per query and scale better as N grows when the index is reused.  
 * Our envelope: Stat\_Filter replaces most FLOPs with bit‑ops and keeps build ≈ 0, so total‑time dominates when data changes.
 
-![][image17]![][image18]
+![SIFT-1M Bounds Analysis](assets/bounds_sift1m.png)
+
+![Fashion-60K Bounds Analysis](assets/bounds_fashion60k.png)
 
 ***Bounds:** Brute‑force lower bound **T∝N×Q**; indexed reuse **T≈Q·log₂N** once built; **Stat\_Filter** sits **below brute‑force** at realistic N,Q when frequent rebuilds keep total‑time dominant.* 
 
@@ -498,13 +500,13 @@ Fashion‑60K summary: **208,333 QPS (48 ms)** at 10k queries and **133,333�
 
 **6.4 Neighbor Distance Analysis**
 
-**![Fashion-60K Distance Analysis](assets/60k-10-batch.png)**
+**![Fashion-60K Distance Analysis](assets/Fashion-MNIST_60K_Dataset_metrics.png)**
 
 *Fashion‑60K/10k — Stat\_Filter 2‑bit: 48 ms, 208,333 QPS, 90% recall, avg dist 922.7 vs opt 917.9 (+0.52%).*
 
 *Fashion‑60K/10k — Stat\_Filter 4‑bit: 68 ms, 147,059 QPS, 95% recall, avg dist 921.1 vs opt 917.9 (+0.35%).*
 
-**![SIFT-1M Distance Analysis](assets/1m-10-batch.png)**
+**![SIFT-1M Distance Analysis](assets/SIFT_1M_Dataset_metrics.png)**
 
 *SIFT‑1M/10k — Stat\_Filter 4‑bit: 161 ms, 62,112 QPS, 98% recall, avg dist 187.79 vs opt 187.75 (+0.02%).*
 
